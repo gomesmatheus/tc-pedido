@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pedido-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: pedido-app
+  template:
+    metadata:
+      labels:
+        app: pedido-app
+    spec:
+      containers:
+      - name: pedido-app-container
+        image: DOCKER_IMAGE
+        resources:
+          limits:
+            memory: 100Mi
+            ephemeral-storage: "2Gi"
