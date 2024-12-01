@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http/httptest"
 	"testing"
@@ -14,10 +15,11 @@ type mockPedidoUseCases struct {
 	FetchPedidos    []entity.Pedido
 	UpdatedStatus   error
 	FetchPedidosErr error
+	CreateErr       error
 }
 
 func (m *mockPedidoUseCases) CriarPedido(p entity.Pedido) (entity.Pedido, error) {
-	return m.CreateResult, nil
+	return m.CreateResult, m.CreateErr
 }
 
 func (m *mockPedidoUseCases) RecuperarPedidos() ([]entity.Pedido, error) {
@@ -44,17 +46,30 @@ func TestCriacaoPedidoRoute(t *testing.T) {
 			expectedBody: "Pedido inserido com id 1",
 		},
 		{
-			name:         "POST with bad request body",
+			name:         "POST with invalid JSON",
 			method:       "POST",
 			body:         "{invalid-json}",
 			expectedCode: 400,
 			expectedBody: "400 bad request",
 		},
 		{
+			name:         "POST with internal error",
+			method:       "POST",
+			body:         `{"cpf":12345,"status":"Pending","metodo_pagamento":"card"}`,
+			expectedCode: 500,
+			expectedBody: "Erro ao cadastrar o pedido",
+		},
+		{
 			name:         "Successful GET",
 			method:       "GET",
 			expectedCode: 200,
 			expectedBody: `[{"id":1,"cpf":12345,"produtos":null,"status":"Pending","metodo_de_pagamento":"card","pagamento_aprovado":false}]`,
+		},
+		{
+			name:         "GET with internal error",
+			method:       "GET",
+			expectedCode: 500,
+			expectedBody: "Erro ao recuperar pedidos",
 		},
 	}
 
@@ -63,6 +78,14 @@ func TestCriacaoPedidoRoute(t *testing.T) {
 			mockUsecase := &mockPedidoUseCases{
 				CreateResult: entity.Pedido{Id: 1, Cpf: 12345, Status: "Pending", MetodoPagamento: "card"},
 				FetchPedidos: []entity.Pedido{{Id: 1, Cpf: 12345, Status: "Pending", MetodoPagamento: "card"}},
+				CreateErr:    nil,
+			}
+
+			// Simulate errors for specific test cases
+			if test.name == "POST with internal error" {
+				mockUsecase.CreateErr = fmt.Errorf("internal error")
+			} else if test.name == "GET with internal error" {
+				mockUsecase.FetchPedidosErr = fmt.Errorf("internal error")
 			}
 
 			handler := NewPedidoHandler(mockUsecase)
@@ -105,10 +128,26 @@ func TestAtualizarPedidoRoute(t *testing.T) {
 			expectedBody: "Pedido atualizado",
 		},
 		{
-			name:         "PATCH with bad request body",
+			name:         "PATCH with invalid JSON",
 			method:       "PATCH",
 			body:         "{invalid-json}",
 			url:          "/pedido/atualizar/1",
+			expectedCode: 400,
+			expectedBody: "400 bad request",
+		},
+		{
+			name:         "PATCH with internal error",
+			method:       "PATCH",
+			body:         `{"status":"Completed"}`,
+			url:          "/pedido/atualizar/1",
+			expectedCode: 500,
+			expectedBody: "Erro ao atualizar o pedido",
+		},
+		{
+			name:         "PATCH with missing ID",
+			method:       "PATCH",
+			body:         `{"status":"Completed"}`,
+			url:          "/pedido/atualizar/abc",
 			expectedCode: 400,
 			expectedBody: "400 bad request",
 		},
@@ -118,6 +157,11 @@ func TestAtualizarPedidoRoute(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			mockUsecase := &mockPedidoUseCases{
 				UpdatedStatus: nil,
+			}
+
+			// Simulate errors for specific test cases
+			if test.name == "PATCH with internal error" {
+				mockUsecase.UpdatedStatus = fmt.Errorf("internal error")
 			}
 
 			handler := NewPedidoHandler(mockUsecase)

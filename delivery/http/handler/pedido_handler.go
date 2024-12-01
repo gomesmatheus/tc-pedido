@@ -75,7 +75,13 @@ func (c *PedidoHandler) CriacaoPedidoRoute(w http.ResponseWriter, r *http.Reques
 }
 
 func (c *PedidoHandler) AtualizarPedidoRoute(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(strings.Split(r.URL.Path, "/")[3], 10, 64)
+	id, err := strconv.ParseInt(strings.Split(r.URL.Path, "/")[3], 10, 64)
+	if err != nil {
+		fmt.Println("Error parsing request body")
+		w.WriteHeader(400)
+		w.Write([]byte("400 bad request"))
+		return
+	}
 	if r.Method == "PATCH" {
 		var patchPedido PatchPedido
 		body, err := io.ReadAll(r.Body)
@@ -92,12 +98,6 @@ func (c *PedidoHandler) AtualizarPedidoRoute(w http.ResponseWriter, r *http.Requ
 			w.WriteHeader(400)
 			w.Write([]byte("400 bad request"))
 			return
-		}
-
-		if patchPedido.Status == "coverage test" {
-			fmt.Println("This is a coverage check")
-			fmt.Println("This is a coverage check")
-			fmt.Println("This is a coverage check")
 		}
 
 		err = c.pedidoUseCases.AtualizarStatus(int(id), patchPedido.Status)

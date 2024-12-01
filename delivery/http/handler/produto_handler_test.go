@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"bytes"
-	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -36,113 +36,250 @@ func (m *MockProdutoUseCases) DeletarProduto(id int) error {
 }
 
 func TestCriacaoProdutoRoute(t *testing.T) {
-	mock := &MockProdutoUseCases{
-		CriarProdutoFn: func(produto entity.Produto) (entity.Produto, error) {
-			return produto, nil
+	tests := []struct {
+		name         string
+		body         string
+		expectedCode int
+		expectedBody string
+		mockResponse func() *MockProdutoUseCases
+	}{
+		{
+			name:         "Successful creation",
+			body:         `{"nome":"Produto Teste"}`,
+			expectedCode: http.StatusCreated,
+			expectedBody: "Produto inserido",
+			mockResponse: func() *MockProdutoUseCases {
+				return &MockProdutoUseCases{
+					CriarProdutoFn: func(produto entity.Produto) (entity.Produto, error) {
+						return produto, nil
+					},
+				}
+			},
+		},
+		{
+			name:         "Error creating product",
+			body:         `{"nome":"Produto Teste"}`,
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: "Erro ao cadastrar o produto",
+			mockResponse: func() *MockProdutoUseCases {
+				return &MockProdutoUseCases{
+					CriarProdutoFn: func(produto entity.Produto) (entity.Produto, error) {
+						return produto, errors.New("error")
+					},
+				}
+			},
 		},
 	}
-	handler := NewProdutoHandler(mock)
 
-	t.Run("POST - Successful creation", func(t *testing.T) {
-		produto := entity.Produto{Nome: "Produto Teste"}
-		body, _ := json.Marshal(produto)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mock := test.mockResponse()
+			handler := NewProdutoHandler(mock)
 
-		req := httptest.NewRequest("POST", "/produtos", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		rr := httptest.NewRecorder()
+			req := httptest.NewRequest("POST", "/produtos", bytes.NewBuffer([]byte(test.body)))
+			req.Header.Set("Content-Type", "application/json")
+			rr := httptest.NewRecorder()
 
-		handler.CriacaoProdutoRoute(rr, req)
+			handler.CriacaoProdutoRoute(rr, req)
 
-		resp := rr.Result()
-		defer resp.Body.Close()
+			resp := rr.Result()
+			defer resp.Body.Close()
 
-		if resp.StatusCode != http.StatusCreated {
-			t.Errorf("expected status 201, got %d", resp.StatusCode)
-		}
+			if resp.StatusCode != test.expectedCode {
+				t.Errorf("expected status %d, got %d", test.expectedCode, resp.StatusCode)
+			}
 
-		responseBody, _ := ioutil.ReadAll(resp.Body)
-		if string(responseBody) != "Produto inserido" {
-			t.Errorf("unexpected response: %s", responseBody)
-		}
-	})
+			responseBody, _ := ioutil.ReadAll(resp.Body)
+			if string(responseBody) != test.expectedBody {
+				t.Errorf("expected body %q, got %q", test.expectedBody, responseBody)
+			}
+		})
+	}
 }
 
 func TestRecuperarProdutosRoute(t *testing.T) {
-	mock := &MockProdutoUseCases{
-		RecuperarProdutosFn: func(categoriaId int) ([]entity.Produto, error) {
-			return []entity.Produto{
-				{Id: 1, Nome: "Produto Teste"},
-			}, nil
+	tests := []struct {
+		name         string
+		url          string
+		expectedCode int
+		expectedBody string
+		mockResponse func() *MockProdutoUseCases
+	}{
+		{
+			name:         "Successful retrieval",
+			url:          "/produtos/1",
+			expectedCode: http.StatusOK,
+			expectedBody: `[{"id":1,"categoria_id":0,"nome":"Produto Teste","descricao":"","preco":0,"tempo_de_preparo":0}]`,
+			mockResponse: func() *MockProdutoUseCases {
+				return &MockProdutoUseCases{
+					RecuperarProdutosFn: func(categoriaId int) ([]entity.Produto, error) {
+						return []entity.Produto{{Id: 1, Nome: "Produto Teste"}}, nil
+					},
+				}
+			},
+		},
+		{
+			name:         "Error retrieving products",
+			url:          "/produtos/1",
+			expectedCode: http.StatusNotFound,
+			expectedBody: "Erro ao recuperar produtos com categoria_id 1",
+			mockResponse: func() *MockProdutoUseCases {
+				return &MockProdutoUseCases{
+					RecuperarProdutosFn: func(categoriaId int) ([]entity.Produto, error) {
+						return nil, errors.New("error")
+					},
+				}
+			},
 		},
 	}
-	handler := NewProdutoHandler(mock)
 
-	t.Run("GET - Successful retrieval", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/produtos/1", nil)
-		rr := httptest.NewRecorder()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mock := test.mockResponse()
+			handler := NewProdutoHandler(mock)
 
-		handler.RecuperarProdutosRoute(rr, req)
+			req := httptest.NewRequest("GET", test.url, nil)
+			rr := httptest.NewRecorder()
 
-		resp := rr.Result()
-		defer resp.Body.Close()
+			handler.RecuperarProdutosRoute(rr, req)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("expected status 200, got %d", resp.StatusCode)
-		}
+			resp := rr.Result()
+			defer resp.Body.Close()
 
-		responseBody, _ := ioutil.ReadAll(resp.Body)
-		if !strings.Contains(string(responseBody), "Produto Teste") {
-			t.Errorf("unexpected response: %s", responseBody)
-		}
-	})
+			if resp.StatusCode != test.expectedCode {
+				t.Errorf("expected status %d, got %d", test.expectedCode, resp.StatusCode)
+			}
+
+			responseBody, _ := ioutil.ReadAll(resp.Body)
+			if !strings.Contains(string(responseBody), test.expectedBody) {
+				t.Errorf("expected body to contain %q, got %q", test.expectedBody, responseBody)
+			}
+		})
+	}
 }
 
 func TestAtualizarProdutoRoute(t *testing.T) {
-	mock := &MockProdutoUseCases{
-		AtualizarProdutoFn: func(id int, produto entity.Produto) error {
-			return nil
+	tests := []struct {
+		name         string
+		url          string
+		body         string
+		expectedCode int
+		expectedBody string
+		mockResponse func() *MockProdutoUseCases
+	}{
+		{
+			name:         "Successful update",
+			url:          "/produtos/1",
+			body:         `{"nome":"Produto Atualizado"}`,
+			expectedCode: http.StatusOK,
+			expectedBody: "",
+			mockResponse: func() *MockProdutoUseCases {
+				return &MockProdutoUseCases{
+					AtualizarProdutoFn: func(id int, produto entity.Produto) error {
+						return nil
+					},
+				}
+			},
+		},
+		{
+			name:         "Error updating product",
+			url:          "/produtos/1",
+			body:         `{"nome":"Produto Atualizado"}`,
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: "500 Erro ao atualizar produto",
+			mockResponse: func() *MockProdutoUseCases {
+				return &MockProdutoUseCases{
+					AtualizarProdutoFn: func(id int, produto entity.Produto) error {
+						return errors.New("error")
+					},
+				}
+			},
 		},
 	}
-	handler := NewProdutoHandler(mock)
 
-	t.Run("PUT - Successful update", func(t *testing.T) {
-		produto := entity.Produto{Nome: "Produto Atualizado"}
-		body, _ := json.Marshal(produto)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mock := test.mockResponse()
+			handler := NewProdutoHandler(mock)
 
-		req := httptest.NewRequest("PUT", "/produtos/1", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		rr := httptest.NewRecorder()
+			req := httptest.NewRequest("PUT", test.url, bytes.NewBuffer([]byte(test.body)))
+			req.Header.Set("Content-Type", "application/json")
+			rr := httptest.NewRecorder()
 
-		handler.RecuperarProdutosRoute(rr, req)
+			handler.RecuperarProdutosRoute(rr, req)
 
-		resp := rr.Result()
-		defer resp.Body.Close()
+			resp := rr.Result()
+			defer resp.Body.Close()
 
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("expected status 200, got %d", resp.StatusCode)
-		}
-	})
+			if resp.StatusCode != test.expectedCode {
+				t.Errorf("expected status %d, got %d", test.expectedCode, resp.StatusCode)
+			}
+
+			responseBody, _ := ioutil.ReadAll(resp.Body)
+			if string(responseBody) != test.expectedBody {
+				t.Errorf("expected body %q, got %q", test.expectedBody, responseBody)
+			}
+		})
+	}
 }
 
 func TestDeletarProdutoRoute(t *testing.T) {
-	mock := &MockProdutoUseCases{
-		DeletarProdutoFn: func(id int) error {
-			return nil
+	tests := []struct {
+		name         string
+		url          string
+		expectedCode int
+		expectedBody string
+		mockResponse func() *MockProdutoUseCases
+	}{
+		{
+			name:         "Successful deletion",
+			url:          "/produtos/1",
+			expectedCode: http.StatusOK,
+			expectedBody: "",
+			mockResponse: func() *MockProdutoUseCases {
+				return &MockProdutoUseCases{
+					DeletarProdutoFn: func(id int) error {
+						return nil
+					},
+				}
+			},
+		},
+		{
+			name:         "Error deleting product",
+			url:          "/produtos/1",
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: "500 Erro ao deletar produto",
+			mockResponse: func() *MockProdutoUseCases {
+				return &MockProdutoUseCases{
+					DeletarProdutoFn: func(id int) error {
+						return errors.New("error")
+					},
+				}
+			},
 		},
 	}
-	handler := NewProdutoHandler(mock)
 
-	t.Run("DELETE - Successful deletion", func(t *testing.T) {
-		req := httptest.NewRequest("DELETE", "/produtos/1", nil)
-		rr := httptest.NewRecorder()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mock := test.mockResponse()
+			handler := NewProdutoHandler(mock)
 
-		handler.RecuperarProdutosRoute(rr, req)
+			req := httptest.NewRequest("DELETE", test.url, nil)
+			rr := httptest.NewRecorder()
 
-		resp := rr.Result()
-		defer resp.Body.Close()
+			handler.RecuperarProdutosRoute(rr, req)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("expected status 200, got %d", resp.StatusCode)
-		}
-	})
+			resp := rr.Result()
+			defer resp.Body.Close()
+
+			if resp.StatusCode != test.expectedCode {
+				t.Errorf("expected status %d, got %d", test.expectedCode, resp.StatusCode)
+			}
+
+			responseBody, _ := ioutil.ReadAll(resp.Body)
+			if string(responseBody) != test.expectedBody {
+				t.Errorf("expected body %q, got %q", test.expectedBody, responseBody)
+			}
+		})
+	}
 }
