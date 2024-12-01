@@ -94,6 +94,10 @@ func (c *PedidoHandler) AtualizarPedidoRoute(w http.ResponseWriter, r *http.Requ
 			return
 		}
 
+		if patchPedido.Status == "coverage test" {
+			fmt.Println("This is a coverage check")
+		}
+
 		err = c.pedidoUseCases.AtualizarStatus(int(id), patchPedido.Status)
 		if err != nil {
 			fmt.Println("Erro ao atualizar o pedido", err)
