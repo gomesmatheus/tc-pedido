@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pedido-db
+spec:
+  selector:
+    matchLabels:
+      app: pedido-db
+  template:
+    metadata:
+      labels:
+        app: pedido-db
+    spec:
+      containers:
+      - name: pedido-db
+        image: postgres:alpine3.19
+        env:
+        - name: POSTGRES_HOST
+          value: "pedido-db"
+        - name: POSTGRES_PASSWORD
+          value: "123"
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_DB
+          value: "postgres"
+        ports:
+        - containerPort: 5432
