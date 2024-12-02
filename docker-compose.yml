@@ -13,8 +13,6 @@ services:
     depends_on: 
       - pedido-db
       - pedido-redis
-    networks:
-      - pedido-bridge
   pedido-db:
     image: postgres:alpine3.19
     container_name: pedido-db
@@ -22,16 +20,6 @@ services:
       - POSTGRES_PASSWORD=123
     ports:
       - 5432:5432
-    networks:
-      - pedido-bridge
-  pedido-redis:
-    image: redis:latest
-    container_name: pedido-redis
-    ports:
-      - "6379:6379"
-    networks:
-      - pedido-bridge
-    restart: always
 networks:
-  pedido-bridge:
+  default:
     driver: bridge

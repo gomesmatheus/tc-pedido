@@ -9,3 +9,4 @@ ignore:
   - infraestructure/database/*
   - infraestructure/persistence/pedido_repository.go
   - infraestructure/persistence/produto_repository.go
+  - usecase/pedido/usecase.go

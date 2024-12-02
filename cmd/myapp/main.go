@@ -12,11 +12,11 @@ import (
 )
 
 func main() {
-	// pedidoRepository, err := database.NewPedidoRepository()
-	// produtoRepository, err := database.NewProdutoRepository()
+	pedidoRepository, err := database.NewPedidoRepository()
+	produtoRepository, err := database.NewProdutoRepository()
 
-	pedidoRepository, err := database.NewPedidoRepositoryLocal()
-	produtoRepository, err := database.NewProdutoRepositoryLocal()
+	// pedidoRepository, err := database.NewPedidoRepositoryLocal()
+	// produtoRepository, err := database.NewProdutoRepositoryLocal()
 
 	if err != nil {
 		log.Fatalf("Error initializing database: %v", err)

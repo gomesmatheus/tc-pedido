@@ -9,5 +9,5 @@ spec:
   ports:
   - protocol: TCP
     port: 80
-    nodePort: 30001  # Port on each node
+    nodePort: 30003  # Port on each node
     targetPort: 3333
