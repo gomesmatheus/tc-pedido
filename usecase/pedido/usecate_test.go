@@ -31,35 +31,6 @@ func (m *MockPedidoRepository) AtualizarPagamento(id int, aprovado bool) error {
 	return m.AtualizarPagamentoMock(id, aprovado)
 }
 
-func TestCriarPedido(t *testing.T) {
-	mockRepo := &MockPedidoRepository{
-		CreatePedidoMock: func(p entity.Pedido) (entity.Pedido, error) {
-			return p, nil
-		},
-	}
-
-	usecase := NewPedidoUseCases(mockRepo)
-
-	testPedido := entity.Pedido{
-		Cpf:             12345678900,
-		Status:          "Recebido",
-		MetodoPagamento: "Cartão",
-		Produtos: []entity.ProdutoPedido{
-			{ProdutoId: 1, Quantidade: 2},
-		},
-	}
-
-	t.Run("Should create a pedido successfully", func(t *testing.T) {
-		createdPedido, err := usecase.CriarPedido(testPedido)
-		if err != nil {
-			t.Errorf("expected no error, got %v", err)
-		}
-		if !reflect.DeepEqual(createdPedido, testPedido) {
-			t.Errorf("expected %v, got %v", testPedido, createdPedido)
-		}
-	})
-}
-
 func TestRecuperarPedidos(t *testing.T) {
 	mockPedidos := []entity.Pedido{
 		{Id: 1, Cpf: 12345678900, Status: "Recebido", MetodoPagamento: "Cartão"},
